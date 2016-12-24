@@ -1,0 +1,34 @@
+simple logger 
+
+v1.0
+
+if init with config file 
+
+/*
+splog.cfg ascii file
+filename@loglevel@logtype
+
+logtype=[tofile toconsole]
+loglevel=[debug,info,warning,error,fatal]
+
+example
+log.txt@warning@tofile
+*/
+
+or 
+#define SLOG_DEFAULT_INIT splog::logger GLOG;
+#define SLOG_TOFILE_LEVEL_INIT(log_filename,loglevel) SLOG_COMMON_INIT(log_filename,loglevel,NULL)
+#define SLOG_TOFILE_INIT(log_filename) SLOG_TOFILE_LEVEL_INIT(log_filename,(splog::LOGL_DEBUG))
+#define SLOG_CFG_INIT(cfg_filename) SLOG_TOFILE_LEVEL_INIT(DEFAULT_LOG_FILENAME,(splog::LOGL_DEBUG),cfg_filename)
+#define SLOG_CFG_DEFAULT_INIT	    SLOG_CFG_INIT(DEFAULT_CFG_FILENAME)
+
+
+writet
+/*
+default log write
+*/
+#define SLOG_DEBUG(foramt,...)	  GLOG.log_fmt_debug(foramt,##__VA_ARGS__)
+#define SLOG_INFO(foramt,...)	  GLOG.log_fmt_info(foramt,##__VA_ARGS__)
+#define SLOG_WARNING(foramt,...)  GLOG.log_fmt_warning(foramt,##__VA_ARGS__)
+#define SLOG_ERROR(foramt,...)    GLOG.log_fmt_error(foramt,##__VA_ARGS__)
+#define SLOG_FATAL(foramt,...)    GLOG.log_fmt_fatal(foramt,##__VA_ARGS__)
