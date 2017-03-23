@@ -7,14 +7,26 @@
 #pragma warning(disable:4819)
 #pragma warning(disable:4018)
 #include "io.h"
+
+#define __FUNCTION_NAME__ __FUNCTION__
 #else
 #include <pthread.h>
-#include "unistd.h"
+#include <unistd.h>
+#include <stdarg.h>
+
+#define __FUNCTION_NAME__ __func__
 #endif
 
 #include <string.h>
 #include "time.h"
 #include <stdio.h>
+
+
+#ifdef	__NO_FUNC_NAME__
+#undef	__FUNCTION_NAME__
+#define __FUNCTION_NAME__ "__FUNC__"
+#endif
+
 
 
 namespace splog
@@ -25,6 +37,9 @@ mutex begin
 */
 namespace internal
 {
+
+
+
 class  mutex
 {
 public:
@@ -56,6 +71,17 @@ typedef enum{ LOGL_DEBUG, LOGL_INFO, LOGL_WARNING, LOGL_ERROR, LOGL_FATAL } LOGL
 #define DEFAULT_LOG_FILENAME "splog.log"
 #define DEFAULT_CFG_FILENAME "splog.cfg"
 
+#define SLTIME  1
+#define SLTID   2
+#define SLSRCFL 4
+#define SLLEVEL 8
+#define SLMSG   16
+#define SLFUNCNAME 32
+
+
+#define SLALL (SLTIME|SLTID|SLSRCFL|SLLEVEL|SLMSG|SLFUNCNAME)
+
+
 /*
 splog.cfg ascii file
 
@@ -72,7 +98,7 @@ log.txt@warning@tofile
 
 
 
-#define log_fmt_common(level,format,...) log_fmt_common_msg(level,__FILE__,__LINE__,format,##__VA_ARGS__)
+#define log_fmt_common(level,format,...) log_fmt_common_msg(level,__FUNCTION_NAME__,__FILE__,__LINE__,format,##__VA_ARGS__)
 
 
 #define log_fmt_debug(format,...)	log_fmt_common(splog::LOGL_DEBUG,format,##__VA_ARGS__)
@@ -87,6 +113,7 @@ public:
 	logger(const char* cfgfilename=NULL,LOGTYPE logtype = LOGTOCONSOLE, const char* filename = DEFAULT_LOG_FILENAME, LOGLEVEL loglevel = LOGL_DEBUG);
 	~logger();
 
+
 	bool init(LOGTYPE logtype = LOGTOFILE,const char* filename = DEFAULT_LOG_FILENAME, LOGLEVEL loglevel = LOGL_DEBUG);
 	bool init_from_file(const char* cfg_filename);
  	void uninit(bool needlock=true);
@@ -96,16 +123,18 @@ public:
 	for convenience
 	auto promote
 	*/
-	logger& log_debug(const char *msg, const char* srcfile = __FILE__, int srcline = __LINE__);
-	logger& log_info(const char *msg, const char* srcfile = __FILE__, int srcline = __LINE__);
-	logger& log_warning(const char *msg, const char* srcfile = __FILE__, int srcline = __LINE__);
-	logger& log_error(const char *msg, const char* srcfile = __FILE__, int srcline = __LINE__);
-	logger& log_fatal(const char *msg, const char* srcfile = __FILE__, int srcline = __LINE__);
-	logger& log_msg(LOGLEVEL level, const char* msg, const char* srcfile = __FILE__, int srcline = __LINE__);
+	logger& log_debug(const char *msg, const char* funcname = NULL, const char* srcfile = __FILE__, int srcline = __LINE__);
+	logger& log_info(const char *msg, const char* funcname = NULL, const char* srcfile = __FILE__, int srcline = __LINE__);
+	logger& log_warning(const char *msg, const char* funcname = NULL, const char* srcfile = __FILE__, int srcline = __LINE__);
+	logger& log_error(const char *msg, const char* funcname = NULL, const char* srcfile = __FILE__, int srcline = __LINE__);
+	logger& log_fatal(const char *msg, const char* funcname = NULL, const char* srcfile = __FILE__, int srcline = __LINE__);
+	logger& log_msg(LOGLEVEL level, const char* msg, const char* funcname = NULL, const char* srcfile = __FILE__, int srcline = __LINE__);
 	/*
 	common msg write
 	*/
-	logger& log_fmt_common_msg(LOGLEVEL level, const char* srcfile , int srcline,const char* format, ...);
+	logger& log_fmt_common_msg(LOGLEVEL level, const char* srcfunction, const char* srcfile, int srcline, const char* format, ...);
+
+	void set_log_flag(long flag);
 private:
 	/*
 	global mutex for console
@@ -116,8 +145,8 @@ private:
 	mutex for each object
 	*/
 	internal::mutex m_mutex;
-	
 
+	long m_log_flag;
 	bool m_initok;
 
 	LOGTYPE  m_cur_logtype;
@@ -128,6 +157,9 @@ private:
 /*
 log end
 */
+
+unsigned int get_current_thread_id();
+
 }
 
 
@@ -156,4 +188,11 @@ default log write
 #define SLOG_WARNING(foramt,...)  GLOG.log_fmt_warning(foramt,##__VA_ARGS__)
 #define SLOG_ERROR(foramt,...)    GLOG.log_fmt_error(foramt,##__VA_ARGS__)
 #define SLOG_FATAL(foramt,...)    GLOG.log_fmt_fatal(foramt,##__VA_ARGS__)
+#define SLOG_FUNC()               SLOG_DEBUG("")
+
+
+/*
+set log flag
+*/
+#define SLOG_SET_FLAG(x)          GLOG.set_log_flag((x))
 #endif

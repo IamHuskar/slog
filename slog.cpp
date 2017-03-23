@@ -14,7 +14,7 @@ splog::internal::mutex::~mutex()
 	DeleteCriticalSection(&m_lock);
 #else
 	pthread_mutex_destroy(&m_lock);
-#endif 
+#endif
 }
 void splog::internal::mutex::lock()
 {
@@ -33,6 +33,23 @@ void splog::internal::mutex::unlock()
 #endif
 }
 
+unsigned int splog::get_current_thread_id()
+{
+#ifdef _WIN32
+	return (unsigned int)GetCurrentThreadId();
+#else
+
+#if 0
+#include <sys/types.h>
+	return (long)gettid();
+#else
+#include <sys/syscall.h>
+return syscall(SYS_gettid);
+#endif
+
+
+#endif
+}
 
 /*
 global mutex for console
@@ -53,7 +70,7 @@ splog::logger::logger(const char* cfgfilename, LOGTYPE logtype, const char* file
 	{
 		init(logtype, filename, loglevel);
 	}
-	
+	m_log_flag = SLALL;
 };
 
 splog::logger::~logger()
@@ -61,12 +78,17 @@ splog::logger::~logger()
 	uninit();
 };
 
-splog::logger& splog::logger::log_msg(LOGLEVEL level, const char* msg, const char* srcfile, int srcline)
+void splog::logger::set_log_flag(long flag)
 {
-	return log_fmt_common_msg(level, srcfile, srcline, msg);
+	m_log_flag = flag;
 };
 
-splog::logger& splog::logger::log_fmt_common_msg(LOGLEVEL level, const char* srcfile, int srcline, const char* format, ...)
+splog::logger& splog::logger::log_msg(LOGLEVEL level, const char* msg, const  char* funcname, const char* srcfile, int srcline)
+{
+	return log_fmt_common_msg(level, funcname,srcfile, srcline, msg);
+};
+
+splog::logger& splog::logger::log_fmt_common_msg(LOGLEVEL level, const char* funcname, const char* srcfile, int srcline, const char* format, ...)
 {
 	FILE* selected_fp = NULL;
 
@@ -83,7 +105,7 @@ splog::logger& splog::logger::log_fmt_common_msg(LOGLEVEL level, const char* src
 		selected_fp = m_console_fp;
 	}
 
-	do 
+	do
 	{
 		if (!m_initok)
 		{
@@ -98,33 +120,47 @@ splog::logger& splog::logger::log_fmt_common_msg(LOGLEVEL level, const char* src
 		{
 			break;
 		}
-		
+
 		if (!selected_fp)
 		{
 			break;
 		}
 
-
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
 		char buffer[MAX_LOG_LEN];
 		/*
 		time
 		*/
-		time_t pt;
-		time(&pt);
-		struct tm * timeinfo;
-		timeinfo = localtime(&pt);
-		sprintf(buffer, "[%d-%d-%d %d:%d:%d]", timeinfo->tm_year + 1900, \
-			timeinfo->tm_mon + 1, \
-			timeinfo->tm_mday, \
-			timeinfo->tm_hour, \
-			timeinfo->tm_min, \
-			timeinfo->tm_sec);
-		fwrite(buffer, 1, strlen(buffer), selected_fp);
+		if (m_log_flag&SLTIME)
+		{
+			time_t pt;
+			time(&pt);
+			struct tm * timeinfo;
+			timeinfo = localtime(&pt);
+			sprintf(buffer, "[%d-%d-%d %d:%d:%d]", timeinfo->tm_year + 1900, \
+				timeinfo->tm_mon + 1, \
+				timeinfo->tm_mday, \
+				timeinfo->tm_hour, \
+				timeinfo->tm_min, \
+				timeinfo->tm_sec);
+			fwrite(buffer, 1, strlen(buffer), selected_fp);
+		}
+
+		fwrite("[ ", 1, 2, selected_fp);
+
+		if (m_log_flag&SLTID)
+		{
+			snprintf(buffer, MAX_LOG_LEN, "TID=%u ", get_current_thread_id());
+			fwrite(buffer, 1, strlen(buffer), selected_fp);
+		}
+
 		/*
 		line and filename
 		*/
 		int flen = strlen(srcfile);
-		if (flen)
+		if (flen&&(m_log_flag&SLSRCFL))
 		{
 			/*
 			not full path but filename
@@ -139,45 +175,58 @@ splog::logger& splog::logger::log_fmt_common_msg(LOGLEVEL level, const char* src
 				}
 			}
 
-#ifdef _MSC_VER
-#define snprintf _snprintf
-#endif
-			snprintf(buffer,MAX_LOG_LEN, " [filename: %s line: %d] ", &srcfile[flen], srcline);
+
+			snprintf(buffer, MAX_LOG_LEN, "%s:%d ", &srcfile[flen], srcline);
 			fwrite(buffer, 1, strlen(buffer), selected_fp);
 		}
+		if (m_log_flag&SLFUNCNAME)
+		{
+			snprintf(buffer, MAX_LOG_LEN, "%s() ", funcname ? funcname:"__FUNC__");
+			fwrite(buffer, 1, strlen(buffer), selected_fp);
+		}
+
+		fwrite("] ", 1, 2, selected_fp);
+
 		/*
 		level prefix
 		*/
-		const char* prefix = "[DEFAULT]";
-		switch (level)
+		if (m_log_flag&SLLEVEL)
 		{
-		case LOGL_DEBUG:
-			prefix = "[DEBUG] ";
-			break;
-		case LOGL_INFO:
-			prefix = "[INFO] ";
-			break;
-		case LOGL_WARNING:
-			prefix = "[WARNING] ";
-			break;
-		case LOGL_ERROR:
-			prefix = "[ERROR] ";
-			break;
-		case LOGL_FATAL:
-			prefix = "[FATAL] ";
-			break;
+			const char* prefix = "[DEFAULT]";
+			switch (level)
+			{
+			case LOGL_DEBUG:
+				prefix = "[DEBUG] ";
+				break;
+			case LOGL_INFO:
+				prefix = "[INFO] ";
+				break;
+			case LOGL_WARNING:
+				prefix = "[WARNING] ";
+				break;
+			case LOGL_ERROR:
+				prefix = "[ERROR] ";
+				break;
+			case LOGL_FATAL:
+				prefix = "[FATAL] ";
+				break;
+			}
+			fwrite(prefix, 1, strlen(prefix), selected_fp);
 		}
-		fwrite(prefix, 1, strlen(prefix), selected_fp);
 		/*
-		msg 
+		msg
 		be careful
-		may overflow 
+		may overflow
 		*/
-		va_list msg_list;
-		va_start(msg_list, format);
-		vsnprintf(buffer,MAX_LOG_LEN-1,format, msg_list);
-		va_end(msg_list);
-		fwrite(buffer, 1, strlen(buffer), selected_fp);
+		if (m_log_flag&SLMSG)
+		{
+			va_list msg_list;
+			va_start(msg_list, format);
+			vsnprintf(buffer, MAX_LOG_LEN - 1, format, msg_list);
+			va_end(msg_list);
+			fwrite(buffer, 1, strlen(buffer), selected_fp);
+		}
+
 
 		/*
 		new line
@@ -270,7 +319,8 @@ bool splog::logger::init_from_file(const char* cfgfilename)
 	char* ptype = NULL;
 	char* pfilename = NULL;
 	char* plevel = NULL;
-	char* errsr = "ok";
+	const char* errsr = "ok";
+	unsigned int i=0;
 	do
 	{
 		if (!cfgfilename)
@@ -292,7 +342,7 @@ bool splog::logger::init_from_file(const char* cfgfilename)
 		}
 		//filename
 		pfilename = cfgstr;
-		for (int i = 0; i < rdl; i++)
+		for (i = 0; i < rdl; i++)
 		{
 			if (!_is_valid_char(cfgstr[i]))
 				break;
@@ -382,7 +432,7 @@ void splog::logger::uninit(bool needlock)
 	{
 		m_mutex.lock();
 	}
-	
+
 	if (m_logfile_fp)
 	{
 		fflush(m_logfile_fp);
@@ -398,7 +448,7 @@ void splog::logger::uninit(bool needlock)
 	{
 		m_mutex.unlock();
 	}
-	
+
 };
 
 void splog::logger::set_log_level(LOGLEVEL loglevel)
@@ -410,23 +460,23 @@ void splog::logger::set_log_level(LOGLEVEL loglevel)
 for convenience
 auto promote
 */
-splog::logger& splog::logger::log_debug(const char *msg, const char* srcfile, int srcline)
+splog::logger& splog::logger::log_debug(const char *msg, const char* funcname, const char* srcfile, int srcline)
 {
-	return log_msg(LOGL_DEBUG, msg, srcfile, srcline);
+	return log_msg(LOGL_DEBUG, msg, funcname, srcfile, srcline);
 };
-splog::logger& splog::logger::log_info(const char *msg, const char* srcfile, int srcline)
+splog::logger& splog::logger::log_info(const char *msg, const char* funcname, const char* srcfile, int srcline)
 {
-	return log_msg(LOGL_INFO, msg, srcfile, srcline);
+	return log_msg(LOGL_INFO, msg, funcname, srcfile, srcline);
 };
-splog::logger& splog::logger::log_warning(const char *msg, const char* srcfile, int srcline)
+splog::logger& splog::logger::log_warning(const char *msg, const char* funcname, const char* srcfile, int srcline)
 {
-	return log_msg(LOGL_WARNING, msg, srcfile, srcline);
+	return log_msg(LOGL_WARNING, msg, funcname, srcfile, srcline);
 };
-splog::logger& splog::logger::log_error(const char *msg, const char* srcfile, int srcline)
+splog::logger& splog::logger::log_error(const char *msg, const char* funcname, const char* srcfile, int srcline)
 {
-	return log_msg(LOGL_ERROR, msg, srcfile, srcline);
+	return log_msg(LOGL_ERROR, msg, funcname,srcfile, srcline);
 };
-splog::logger& splog::logger::log_fatal(const char *msg, const char* srcfile, int srcline)
+splog::logger& splog::logger::log_fatal(const char *msg,const char* funcname, const char* srcfile, int srcline)
 {
-	return log_msg(LOGL_FATAL, msg, srcfile, srcline);
+	return log_msg(LOGL_FATAL, msg, funcname, srcfile, srcline);
 };

@@ -22,8 +22,6 @@ or
 #define SLOG_CFG_INIT(cfg_filename) SLOG_TOFILE_LEVEL_INIT(DEFAULT_LOG_FILENAME,(splog::LOGL_DEBUG),cfg_filename)
 #define SLOG_CFG_DEFAULT_INIT	    SLOG_CFG_INIT(DEFAULT_CFG_FILENAME)
 
-
-writet
 /*
 default log write
 */
@@ -32,3 +30,19 @@ default log write
 #define SLOG_WARNING(foramt,...)  GLOG.log_fmt_warning(foramt,##__VA_ARGS__)
 #define SLOG_ERROR(foramt,...)    GLOG.log_fmt_error(foramt,##__VA_ARGS__)
 #define SLOG_FATAL(foramt,...)    GLOG.log_fmt_fatal(foramt,##__VA_ARGS__)
+
+V1.1 2017.3.3.23
+support linux version
+
+add function name ,thread id information
+
+support set_log_flag()
+#define SLTIME  1 	    time
+#define SLTID   2 		threadid
+#define SLSRCFL 4 		filename line number
+#define SLLEVEL 8  		level info
+#define SLMSG   16 		sufix info
+#define SLFUNCNAME 32 	function name
+#define SLALL (SLTIME|SLTID|SLSRCFL|SLLEVEL|SLMSG|SLFUNCNAME)
+
+set_log_flag(SLALL)
