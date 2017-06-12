@@ -1,7 +1,71 @@
-#ifndef  _SLOG_PRIV_LIB_H_
+﻿#ifndef  _SLOG_PRIV_LIB_H_
 #define  _SLOG_PRIV_LIB_H_
 
+
+
+/*
+基本的宏 配置日志
+#define SLOG_DEFAULT_INIT splog::logger GLOG;
+#define SLOG_TOFILE_LEVEL_INIT(log_filename,loglevel) SLOG_COMMON_INIT(log_filename,loglevel,NULL)
+#define SLOG_TOFILE_INIT(log_filename) SLOG_TOFILE_LEVEL_INIT(log_filename,(splog::LOGL_DEBUG))
+#define SLOG_CFG_INIT(cfg_filename) SLOG_TOFILE_LEVEL_INIT(DEFAULT_LOG_FILENAME,(splog::LOGL_DEBUG),cfg_filename)
+#define SLOG_CFG_DEFAULT_INIT	    SLOG_CFG_INIT(DEFAULT_CFG_FILENAME)
+
+
+通过配置文件操作
+CFGFILE
+splog.cfg ascii file
+
+filename@loglevel@logtype
+
+logtype=[tofile toconsole]
+loglevel=[debug,info,warning,error,fatal]
+
+example
+log.txt@warning@tofile
+
+
+设置FLAG的标记。哪些需要记录。哪些不需要记录
+SETLOGFLAG
+#define SLTIME  1 	    time
+#define SLTID   2 		threadid
+#define SLSRCFL 4 		filename line number
+#define SLLEVEL 8  		level info
+#define SLMSG   16 		sufix info
+#define SLFUNCNAME 32 	function name
+#define SLALL (SLTIME|SLTID|SLSRCFL|SLLEVEL|SLMSG|SLFUNCNAME)
+
+SET_LOG_FLAG(SLALL)
+
+
+添加常用问题记录。
+#define SLOG_INVALID_ARGS				SLOG_FATAL("INVALID ARGUMENTS");
+#define SLOG_NULL_POINTER				SLOG_FATAL("NULL POINTER");
+#define SLOG_BUFFER_TOO_SMALL			SLOG_FATAL("DATA OR BUFFER TOO SMALL");
+#define SLOG_BUFFER_TOO_LARGE			SLOG_FATAL("DATA OR BUFFER TOO LARGE");
+#define SLOG_REACHHERE					SLOG_FATAL("REACH HERE");
+#define SLOG_SYS_API_ERROR				SLOG_FATAL("CALL SYSAPI ERROR");
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #ifdef _WIN32
+/*
+fix conflict with std::min() std::max()
+*/
+#define NOMINMAX
+
 #include <Windows.h>
 #pragma warning(disable:4996)
 #pragma warning(disable:4819)
@@ -82,17 +146,6 @@ typedef enum{ LOGL_DEBUG, LOGL_INFO, LOGL_WARNING, LOGL_ERROR, LOGL_FATAL } LOGL
 #define SLALL (SLTIME|SLTID|SLSRCFL|SLLEVEL|SLMSG|SLFUNCNAME)
 
 
-/*
-splog.cfg ascii file
-
-filename@loglevel@logtype
-
-logtype=[tofile toconsole]
-loglevel=[debug,info,warning,error,fatal]
-
-example
-log.txt@warning@tofile
-*/
 
 #define MAX_LOG_LEN 1024
 
@@ -195,4 +248,19 @@ default log write
 set log flag
 */
 #define SLOG_SET_FLAG(x)          GLOG.set_log_flag((x))
+
+
+
+
+/*
+convenient log
+*/
+#define SLOG_INVALID_ARGS				SLOG_FATAL("INVALID ARGUMENTS");
+#define SLOG_NULL_POINTER				SLOG_FATAL("NULL POINTER");
+#define SLOG_BUFFER_TOO_SMALL			SLOG_FATAL("DATA OR BUFFER TOO SMALL");
+#define SLOG_BUFFER_TOO_LARGE			SLOG_FATAL("DATA OR BUFFER TOO LARGE");
+#define SLOG_REACHHERE					SLOG_FATAL("REACH HERE");
+#define SLOG_SYS_API_ERROR				SLOG_FATAL("CALL SYSAPI ERROR");
 #endif
+
+
